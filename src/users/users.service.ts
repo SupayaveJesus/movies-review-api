@@ -10,7 +10,6 @@ export class UsersService {
         @InjectRepository(User)
         private usersRepository: Repository<User>,
     ) {}
-
     findByEmail(email: string): Promise<User | null> {
         return this.usersRepository.findOneBy({ email });
     }
