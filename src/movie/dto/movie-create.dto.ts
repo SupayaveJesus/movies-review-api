@@ -1,5 +1,5 @@
 // src/movies/dto/create-movie.dto.ts
-import { IsNotEmpty, IsString, IsNumber } from "class-validator";
+import { IsNotEmpty, IsString, IsNumber, IsOptional } from "class-validator";
 
 export class CreateMovieDto {
     @IsNotEmpty()
@@ -10,7 +10,7 @@ export class CreateMovieDto {
     @IsNumber()
     year: number; // año
 
-    @IsNotEmpty()
+    @IsOptional()
     @IsString()
-    imageUrl: string; // imagen
+    imageUrl?: string; // imagen (ruta opcional)
 }

@@ -10,6 +10,7 @@ import { JwtUser } from "../auth/dto/jwt-user.interface";
 export class ReviewsController {
     constructor(private readonly reviewService: ReviewService) {}
 
+
     @UseGuards(JwtAuthGuard)
     @Post()
     createReview(@Request() req: ExpressRequest & { user: JwtUser }, @Body() dto: CreateReviewDto): Promise<any> {
@@ -31,7 +32,21 @@ export class ReviewsController {
         return this.reviewService.deleteReview(Number(id), userId);
     }
 
-    // Rutas públicas (sin JWT)
+    @UseGuards(JwtAuthGuard)
+    @Get("me")
+    getMyReviews(@Request() req: ExpressRequest & { user: JwtUser }): Promise<any> {
+        const userId = req.user.id;
+        return this.reviewService.findByUser(userId);
+    }
+
+    //  "lista de las últimas películas que el usuario haya hecho review")
+    @UseGuards(JwtAuthGuard)
+    @Get("me/latest-movies")
+    getMyLatestMovies(@Request() req: ExpressRequest & { user: JwtUser }): Promise<any> {
+        const userId = req.user.id;
+        return this.reviewService.findLatestMoviesByUser(userId, 20);
+    }
+
     @Get("/movie/:movieId")
     findReviewsByMovie(@Param("movieId") movieId: string): Promise<any> {
         return this.reviewService.findByMovie(Number(movieId));

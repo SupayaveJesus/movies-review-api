@@ -1,123 +1,116 @@
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
+// src/review/review.service.ts
+import { ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
 import { Review } from "./entities/review.entity";
-import { MoviesService } from "../movie/movie.service";
-import { UsersService } from "src/users/users.service";
+import { Movie } from "../movie/entities/movie.entity";
+import { User } from "../users/entities/user.entity";
 import { CreateReviewDto } from "./dto/create-review.dto";
 import { UpdateReviewDto } from "./dto/update-review.dto";
-import { LatestUserMovieDto } from "./dto/latest-user-movie.dto";
-import { Movie } from "src/movie/entities/movie.entity";
 
 @Injectable()
 export class ReviewService {
     constructor(
         @InjectRepository(Review)
-        private readonly reviewRepository: Repository<Review>,
-        private readonly movieService: MoviesService,
-        private readonly userService: UsersService,
+        private readonly reviewRepo: Repository<Review>,
+
+        @InjectRepository(Movie)
+        private readonly movieRepo: Repository<Movie>,
+
+        @InjectRepository(User)
+        private readonly userRepo: Repository<User>,
     ) {}
 
-    async createReview(userId: number, dto: CreateReviewDto): Promise<Review> {
-        const user = await this.userService.findById(userId);
+    async createReview(userId: number, dto: CreateReviewDto) {
+        const movie = await this.movieRepo.findOne({ where: { id: dto.movieId } });
+        if (!movie) {
+            throw new NotFoundException("Película no encontrada");
+        }
+
+        const user = await this.userRepo.findOne({ where: { id: userId } });
         if (!user) {
-            throw new NotFoundException("User not found");
+            throw new NotFoundException("Usuario no encontrado");
         }
 
-        let movie: Movie;
-
-        if (dto.movieId) {
-            //movie existente
-            movie = await this.movieService.findById(dto.movieId);
-            if (!movie) {
-                throw new NotFoundException("Movie not found");
-            }
-        } else if (dto.movie) {
-            //movie nueva
-            movie = await this.movieService.createMovie(dto.movie);
-        } else {
-            throw new BadRequestException("Debe enviar movieId o movie");
-        }
-
-        const newReview = this.reviewRepository.create({
-            text: dto.text,
+        const review = this.reviewRepo.create({
             rating: dto.rating,
-            user,
+            text: dto.text,
             movie,
+            user,
         });
 
-        return await this.reviewRepository.save(newReview);
+        return this.reviewRepo.save(review);
     }
 
-    async updateReview(id: number, userId: number, dto: UpdateReviewDto): Promise<Review> {
-        const review = await this.reviewRepository.findOne({
-            where: { id },
-            relations: ["user"], // por si algún día quitas el eager
+    async updateReview(reviewId: number, userId: number, dto: UpdateReviewDto) {
+        const review = await this.reviewRepo.findOne({
+            where: { id: reviewId },
+            relations: ["user"],
         });
 
         if (!review) {
-            throw new NotFoundException("Review not found");
+            throw new NotFoundException("Review no encontrada");
         }
 
         if (review.user.id !== userId) {
-            throw new ForbiddenException("You can only update your own reviews");
+            throw new ForbiddenException("No puedes editar esta reseña");
         }
 
-        Object.assign(review, dto);
-        return this.reviewRepository.save(review);
+        if (dto.rating !== undefined) review.rating = dto.rating;
+        if (dto.text !== undefined) review.text = dto.text;
+
+        return this.reviewRepo.save(review);
     }
 
-    async deleteReview(id: number, userId: number): Promise<any> {
-        const review = await this.reviewRepository.findOne({ where: { id } });
+    async deleteReview(reviewId: number, userId: number) {
+        const review = await this.reviewRepo.findOne({
+            where: { id: reviewId },
+            relations: ["user"],
+        });
 
         if (!review) {
-            throw new NotFoundException("Review not found");
+            throw new NotFoundException("Review no encontrada");
         }
 
         if (review.user.id !== userId) {
-            throw new ForbiddenException("You can only delete your own reviews");
+            throw new ForbiddenException("No puedes eliminar esta reseña");
         }
 
-        await this.reviewRepository.remove(review);
-
-        return { message: "Review deleted successfully" };
+        await this.reviewRepo.remove(review);
+        return { success: true };
     }
 
-    async findByMovie(movieId: number): Promise<Review[]> {
-        return this.reviewRepository.find({
+    async findByMovie(movieId: number) {
+        return this.reviewRepo.find({
             where: { movie: { id: movieId } },
-            order: { createdAt: "DESC" },
+            relations: ["user"],
+            order: { id: "DESC" },
         });
     }
 
-    async findByUser(userId: number): Promise<Review[]> {
-        return this.reviewRepository.find({
+    async findByUser(userId: number) {
+        return this.reviewRepo.find({
             where: { user: { id: userId } },
-            order: { createdAt: "DESC" },
+            relations: ["movie"],
+            order: { id: "DESC" },
+            take: 20,
         });
     }
 
-    async findLastReviews(userId: number, limit: number = 10): Promise<Review[]> {
-        return this.reviewRepository.find({
+    async findLatestMoviesByUser(userId: number, limit: number) {
+        const reviews = await this.reviewRepo.find({
             where: { user: { id: userId } },
-            order: { createdAt: "DESC" },
+            relations: ["movie"],
+            order: { id: "DESC" },
             take: limit,
         });
-    }
 
-    async findLatestMoviesByUser(userId: number, limit = 20): Promise<LatestUserMovieDto[]> {
-        const qb = this.reviewRepository
-            .createQueryBuilder("review")
-            .innerJoin("review.movie", "movie")
-            .where("review.userId = :userId", { userId })
-            .select(['movie.id AS "movieId"', "movie.title AS title", "movie.year AS year", 'movie.imageUrl AS "imageUrl"', 'MAX(review.createdAt) AS "lastReviewDate"'])
-            .groupBy("movie.id")
-            .addGroupBy("movie.title")
-            .addGroupBy("movie.year")
-            .addGroupBy("movie.imageUrl")
-            .orderBy('"lastReviewDate"', "DESC")
-            .limit(limit);
-
-        return await qb.getRawMany<LatestUserMovieDto>();
+        const moviesMap = new Map<number, Movie>();
+        for (const r of reviews) {
+            if (r.movie && !moviesMap.has(r.movie.id)) {
+                moviesMap.set(r.movie.id, r.movie);
+            }
+        }
+        return Array.from(moviesMap.values());
     }
 }

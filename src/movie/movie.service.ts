@@ -40,37 +40,33 @@ export class MoviesService {
         return movie;
     }
 
-    async findTopRated(): Promise<MovieTopDto[]> {
-        const raw: MovieTopRaw[] = await this.moviesRepository
+    async findTopRated() {
+        const movies = await this.moviesRepository
             .createQueryBuilder("movie")
             .leftJoin("movie.reviews", "review")
-            .select("movie.id", "id")
-            .addSelect("movie.title", "title")
-            .addSelect("movie.year", "year")
-            .addSelect("movie.imageUrl", "imageUrl")
-            .addSelect("AVG(review.rating)", "avgrating")
-            .addSelect("COUNT(review.id)", "reviewcount")
+            .select([
+                "movie.id",
+                "movie.title",
+                "movie.year",
+                "movie.imageUrl", // ← IMPORTANTE
+            ])
+            .addSelect("AVG(review.rating)", "avgRating")
+            .addSelect("COUNT(review.id)", "reviewCount")
             .groupBy("movie.id")
-            .orderBy(
-                `CASE 
-                    WHEN AVG(review.rating) IS NULL THEN 1 
-                    ELSE 0 
-                END`,
-                "ASC",
-            )
-            .addOrderBy("AVG(review.rating)", "DESC")
-            .addOrderBy("COUNT(review.id)", "DESC")
-            .addOrderBy("movie.id", "ASC")
+            // Use the aggregation expression in ORDER BY to avoid Postgres
+            // identifier case/quoting issues with the alias (avgRating).
+            .orderBy("AVG(review.rating)", "DESC")
             .limit(20)
             .getRawMany();
 
-        return raw.map(item => ({
-            id: Number(item.id),
-            title: item.title,
-            year: Number(item.year),
-            imageUrl: item.imageurl,
-            avgRating: item.avgrating ? Number(parseFloat(item.avgrating).toFixed(1)) : null,
-            reviewCount: Number(item.reviewcount),
+        // Convertir resultado raw a formato limpio
+        return movies.map(movie => ({
+            id: movie.movie_id,
+            title: movie.movie_title,
+            year: movie.movie_year,
+            imageUrl: movie.movie_imageUrl, // ← VA AL FRONTEND
+            avgRating: Number(movie.avgRating) || null,
+            reviewCount: Number(movie.reviewCount) || 0,
         }));
     }
 }

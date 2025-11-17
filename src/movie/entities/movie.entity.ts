@@ -13,7 +13,8 @@ export class Movie {
     year: number;
 
     @Column()
-    imageUrl: string;
+    @Column({ nullable: true })
+    imageUrl?: string;
 
     @OneToMany(() => Review, review => review.movie)
     reviews: Review[];

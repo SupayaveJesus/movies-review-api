@@ -7,10 +7,16 @@ import { TypeOrmModule } from "@nestjs/typeorm";
 import { ConfigModule } from "@nestjs/config";
 import { MovieModule } from "./movie/movie.module";
 import { ReviewModule } from "./review/review.module";
+import { ServeStaticModule } from "@nestjs/serve-static";
+import { join } from "path";
 
 @Module({
     imports: [
         ConfigModule.forRoot(),
+        ServeStaticModule.forRoot({
+            rootPath: join(__dirname, "..", "uploads"),
+            serveRoot: "/uploads",
+        }),
         TypeOrmModule.forRoot({
             type: "postgres",
             host: process.env.DB_HOST,
