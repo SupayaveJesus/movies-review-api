@@ -13,7 +13,6 @@ export class CreateReviewDto {
     @Max(5)
     rating: number;
 
-    // Puede enviar movieId (película existente) o movie (objeto para crear nueva película)
     @IsOptional()
     @IsNumber()
     movieId?: number;

@@ -49,9 +49,11 @@ export class ReviewService {
         return await this.reviewRepository.save(newReview);
     }
 
-    // Editar review
     async updateReview(id: number, userId: number, dto: UpdateReviewDto): Promise<Review> {
-        const review = await this.reviewRepository.findOne({ where: { id } });
+        const review = await this.reviewRepository.findOne({
+            where: { id },
+            relations: ["user"], // por si algún día quitas el eager
+        });
 
         if (!review) {
             throw new NotFoundException("Review not found");
@@ -65,7 +67,6 @@ export class ReviewService {
         return this.reviewRepository.save(review);
     }
 
-    // Eliminar review
     async deleteReview(id: number, userId: number): Promise<any> {
         const review = await this.reviewRepository.findOne({ where: { id } });
 
@@ -82,7 +83,6 @@ export class ReviewService {
         return { message: "Review deleted successfully" };
     }
 
-    // Reviews por película
     async findByMovie(movieId: number): Promise<Review[]> {
         return this.reviewRepository.find({
             where: { movie: { id: movieId } },
@@ -90,7 +90,6 @@ export class ReviewService {
         });
     }
 
-    // Reviews por usuario
     async findByUser(userId: number): Promise<Review[]> {
         return this.reviewRepository.find({
             where: { user: { id: userId } },
@@ -98,7 +97,6 @@ export class ReviewService {
         });
     }
 
-    // Últimos reviews (opcional)
     async findLastReviews(userId: number, limit: number = 10): Promise<Review[]> {
         return this.reviewRepository.find({
             where: { user: { id: userId } },
@@ -107,7 +105,6 @@ export class ReviewService {
         });
     }
 
-    // Últimas películas que el usuario revieweó
     async findLatestMoviesByUser(userId: number, limit = 20): Promise<LatestUserMovieDto[]> {
         const qb = this.reviewRepository
             .createQueryBuilder("review")

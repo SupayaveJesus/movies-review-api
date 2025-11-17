@@ -1,38 +1,54 @@
-import { ConflictException, Injectable, UnauthorizedException } from "@nestjs/common";
+import { Injectable, UnauthorizedException, ConflictException } from "@nestjs/common";
 import { UsersService } from "../users/users.service";
-import { generateAuthToken, stringToSha1 } from "./crypto.utils";
+import { JwtService } from "@nestjs/jwt";
 import { UserLoginDto } from "./dto/user-login.dto";
 import { UserRegisterDto } from "./dto/user-register.dto";
-import { UserRegisterResponseDto } from "./dto/register-response.dto";
+import { hashPassword } from "./crypto.utils";
 
 @Injectable()
 export class AuthService {
-    constructor(private usersService: UsersService) {}
+    constructor(
+        private usersService: UsersService,
+        private jwtService: JwtService,
+    ) {}
 
-    async login(body: UserLoginDto): Promise<any> {
-        const user = await this.usersService.findByEmail(body.email);
+    async login(body: UserLoginDto) {
+        const user = await this.usersService.findByEmail(body.email, true);
+
         if (!user) {
-            throw new UnauthorizedException();
+            throw new UnauthorizedException("Invalid credentials");
         }
-        const hashedPassword = stringToSha1(body.password);
-        if (user.password !== hashedPassword) {
-            throw new UnauthorizedException();
+
+        const hashed = hashPassword(body.password);
+
+        if (user.password !== hashed) {
+            throw new UnauthorizedException("Invalid credentials");
         }
-        const token = generateAuthToken(user.email);
-        //TODO: Almacenar el token o usar JWT para no necesitar almacenarlo
-        return { token, user: { id: user.id, email: user.email, fullName: user.fullName } };
+
+        const payload = { sub: user.id, email: user.email };
+
+        return {
+            token: this.jwtService.sign(payload),
+            user: { id: user.id, email: user.email, fullName: user.fullName },
+        };
     }
-    async register(body: UserRegisterDto): Promise<UserRegisterResponseDto> {
-        const user = await this.usersService.findByEmail(body.email);
-        if (user) {
-            throw new ConflictException("User already exists");
-        }
-        const hashedPassword = stringToSha1(body.password);
+
+    async register(body: UserRegisterDto) {
+        const exists = await this.usersService.findByEmail(body.email);
+        if (exists) throw new ConflictException("User already exists");
+
+        const hashed = hashPassword(body.password);
+
         const newUser = await this.usersService.createUser({
             email: body.email,
-            password: hashedPassword,
+            password: hashed,
             fullName: body.fullName,
         });
-        return { id: newUser.id, email: newUser.email, fullName: newUser.fullName } as UserRegisterResponseDto;
+
+        return {
+            id: newUser.id,
+            email: newUser.email,
+            fullName: newUser.fullName,
+        };
     }
 }

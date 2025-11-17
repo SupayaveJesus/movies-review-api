@@ -1,27 +1,37 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Param, Patch, Post, UseGuards, Request } from "@nestjs/common";
 import { ReviewService } from "./review.service";
 import { CreateReviewDto } from "./dto/create-review.dto";
 import { UpdateReviewDto } from "./dto/update-review.dto";
+import { JwtAuthGuard } from "src/auth/jwt-auth.guard";
+import { Request as ExpressRequest } from "express";
+import { JwtUser } from "../auth/dto/jwt-user.interface";
 
 @Controller("reviews")
 export class ReviewsController {
     constructor(private readonly reviewService: ReviewService) {}
 
+    @UseGuards(JwtAuthGuard)
     @Post()
-    createReview(@Query("userId") userId: string, @Body() dto: CreateReviewDto): Promise<any> {
-        return this.reviewService.createReview(Number(userId), dto);
+    createReview(@Request() req: ExpressRequest & { user: JwtUser }, @Body() dto: CreateReviewDto): Promise<any> {
+        const userId = req.user.id;
+        return this.reviewService.createReview(userId, dto);
     }
 
+    @UseGuards(JwtAuthGuard)
     @Patch(":id")
-    updateReview(@Param("id") id: string, @Query("userId") userId: string, @Body() dto: UpdateReviewDto): Promise<any> {
-        return this.reviewService.updateReview(Number(id), Number(userId), dto);
+    updateReview(@Param("id") id: string, @Request() req: ExpressRequest & { user: JwtUser }, @Body() dto: UpdateReviewDto): Promise<any> {
+        const userId = req.user.id;
+        return this.reviewService.updateReview(Number(id), userId, dto);
     }
 
+    @UseGuards(JwtAuthGuard)
     @Delete(":id")
-    deleteReview(@Param("id") id: string, @Query("userId") userId: string): Promise<any> {
-        return this.reviewService.deleteReview(Number(id), Number(userId));
+    deleteReview(@Param("id") id: string, @Request() req: ExpressRequest & { user: JwtUser }): Promise<any> {
+        const userId = req.user.id;
+        return this.reviewService.deleteReview(Number(id), userId);
     }
 
+    // Rutas públicas (sin JWT)
     @Get("/movie/:movieId")
     findReviewsByMovie(@Param("movieId") movieId: string): Promise<any> {
         return this.reviewService.findByMovie(Number(movieId));

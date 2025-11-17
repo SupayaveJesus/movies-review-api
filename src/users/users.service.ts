@@ -10,7 +10,14 @@ export class UsersService {
         @InjectRepository(User)
         private usersRepository: Repository<User>,
     ) {}
-    findByEmail(email: string): Promise<User | null> {
+    async findByEmail(email: string, includePassword = false): Promise<User | null> {
+        if (includePassword) {
+            return this.usersRepository.findOne({
+                where: { email },
+                select: { id: true, email: true, password: true, fullName: true },
+            });
+        }
+
         return this.usersRepository.findOneBy({ email });
     }
 

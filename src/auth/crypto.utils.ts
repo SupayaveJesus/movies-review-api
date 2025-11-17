@@ -1,10 +1,14 @@
 import * as crypto from "crypto";
 
-export const stringToSha1 = str => {
-    const shasum = crypto.createHash("sha1");
-    shasum.update(str);
-    return shasum.digest("hex");
-};
-export const generateAuthToken = salt => {
-    return stringToSha1(salt + new Date().getTime());
-};
+// Hash seguro SHA-256
+export function hashPassword(str: string): string {
+    return crypto.createHash("sha256").update(str).digest("hex");
+}
+
+// Generar un token interno usando SHA-256 también
+export function generateAuthToken(salt: string): string {
+    return crypto
+        .createHash("sha256")
+        .update(salt + Date.now().toString())
+        .digest("hex");
+}
